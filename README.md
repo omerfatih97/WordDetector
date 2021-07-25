@@ -1,4 +1,4 @@
-# WordDetector
+# WordDetector (.Net Application)
 
 It's a small utility for processing a text file.
 The user interface shall allow to specify the text file to be processed.
