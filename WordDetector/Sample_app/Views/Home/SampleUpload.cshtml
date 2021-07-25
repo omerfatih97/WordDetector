@@ -1,0 +1,304 @@
+﻿
+@{
+	ViewBag.Title = "Sample Upload Page";
+	Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+
+
+
+@using (Html.BeginForm("SampleUpload", "Home", FormMethod.Post, new { enctype = "multipart/form-data" }))
+{
+	<br />
+	<br />
+	<div class="jumbotron">
+		<fieldset>
+			<legend>Please Select File Over File Chooser</legend>
+
+			<div>
+				<div id="FileBrowse">
+					<div class="row">
+						<div class="col-sm-4">
+							<input type="file" id="Files" accept=".txt" />
+						</div>
+						<div class="col-sm-2">
+							<input type="button" id="UploadBtn" class="btn btn-success" value="Upload" />
+						</div>
+						<div class="col-sm-2">
+							<input type="button" id="PauseBtn" class="btn btn-warning" value="Pause" />
+						</div>
+						<div class="col-sm-2">
+							<input type="button" id="ContinueBtn" class="btn btn-info" value="Continue" />
+						</div>
+
+						<div class="col-m-8">
+						</div>
+						<div class="col-sm-2">
+							<input type="button" id="abortBtn" class="btn btn-danger" value="ABORT" />
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-sm-4">
+						<div id="progressbar-5">
+							<div class="progress-label">
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</fieldset>
+	</div>
+}
+
+<div id="succAlert" class="alert alert-success" role="alert" style="display:none">
+	<p id="succAlertMes"></p>
+</div>
+
+<div id="errAlert" class="alert alert-danger" role="alert" style="display:none">
+	<p id="errAlertMes"></p>
+</div>
+
+<div id="reportResult">
+</div>
+
+
+<br />
+<br />
+<div id="resultDiv" style="display:none">
+	<div class="row">
+		<fieldset>
+			<div class="row">
+				<div class="col-sm-6">
+					<table class="table" id="ListofFiles">
+						<tr>
+							<th>
+								Word
+							</th>
+							<th>
+								Occurence
+							</th>
+						</tr>
+					</table>
+				</div>
+			</div>
+
+			<br />
+			<div class="row">
+				<div class="col-md-12">
+					<div class="col-md-12">
+						<a href="#" onclick="exportToFileClck();">Export To Text File</a>
+					</div>
+				</div>
+			</div>
+		</fieldset>
+	</div>
+</div>
+
+
+
+<script type="text/javascript">
+
+	function onSelect(e) {
+        var files = e.files
+        var acceptedFiles = [".txt"]
+        var isAcceptedImageFormat = ($.inArray(files[0].extension, acceptedFiles)) != -1
+        if (!isAcceptedImageFormat) {
+            e.preventDefault();
+        }
+    }
+
+    var param = '@ViewBag.Success';
+    var param1 = '@ViewBag.Error';
+    var param2 = '@ViewBag.Result';
+
+	$(document).ready(function () {
+
+		$("#ContinueBtn").hide();
+		$("#PauseBtn").hide();
+		$("#abortBtn").hide();
+	});
+
+
+</script>
+
+@section scripts{
+	<script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+	<script src="https://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
+	<script>
+		var stopProc = 0;
+		var resulArr = new Array();
+		var lastIndex = 0;
+		var uploadedAgain = 0;
+		var increaseBar = 0;
+		var aborted = 0;
+
+		var progressbar = $("#progressbar-5");
+		var progressLabel = $(".progress-label");
+
+		var successMessage = 'Process Successfully Done.';
+
+		function initPage() {
+
+			stopProc = 0;
+			resulArr = new Array();
+			lastIndex = 0;
+
+			document.getElementById('resultDiv').style.display = "none";
+			document.getElementById('succAlert').style.display = "none";
+			document.getElementById('errAlert').style.display = "none";
+			document.getElementById('succAlertMes').innerHTML = '';
+			document.getElementById('errAlertMes').innerHTML = ''
+		}
+
+		$('#UploadBtn').click(function () {
+
+			$("#ListofFiles tr").remove();
+			initPage();
+			$("#PauseBtn").show();
+			$("#abortBtn").show();
+			$('#Files').prop("disabled", false);
+			aborted = 0;
+			var fileUpload = $("#Files").get(0);
+			var files = fileUpload.files;
+			// Create FormData object
+			var fileData = new FormData();
+			// Looping over all files and add it to FormData object
+			for (var i = 0; i < files.length; i++) {
+				fileData.append(files[i].name, files[i]);
+			}
+			$.ajax({
+				url: '/Home/UploadFiles',
+				type: "POST",
+				contentType: false, // Not to set any content header
+				processData: false, // Not to process data
+				data: fileData,
+				async: false,
+				success: function (result) {
+					debugger;
+					if (result != "") {
+						resulArr = result;
+						increaseBar = 100 / resulArr.length;
+						$('#FileBrowse').prop("disabled", true);
+						$('#UploadBtn').prop("disabled", true);
+						$('#Files').prop("disabled", true);
+
+						LoadProgressBar(resulArr); //calling LoadProgressBar function to load the progress bar.
+					}
+				},
+				error: function (err) {
+					document.getElementById('errAlert').style.display = "";
+					document.getElementById('errAlertMes').innerHTML = "Error Occured: " + err.statusText;
+				}
+			});
+
+			uploadedAgain++;
+		});
+
+		function LoadProgressBar(result) {
+
+			progressbar.show();
+
+			document.getElementById('resultDiv').style.display = "";
+			if (lastIndex == 0) {
+				var headTitle = "<tr><th> WORD </th><th>Occurence</th></tr>"; // Binding the title
+				$("#ListofFiles tbody").append(headTitle);
+				var i = 0;
+			}
+			else {
+				i = lastIndex;
+			}
+
+			$("#progressbar-5").progressbar({
+				//value: false,
+				change: function () {
+					if (stopProc == 0) {
+						if (i < result.length) {
+
+							var markup = "<tr><td>" + result[i].Word + "</td><td>" + result[i].Count + "</td></tr>"; // Binding the words and occurences
+							$("#ListofFiles tbody").append(markup); i++;
+						}
+						progressLabel.text(
+							progressbar.progressbar("value") + "%");  // Showing the progress increment value in progress bar
+
+						lastIndex = i;
+					}
+				}
+			});
+			function progress() {
+				if (lastIndex == 0 &&
+					uploadedAgain != 0) {
+
+					progressbar.progressbar("value", 0);  //Reinitialize the progress bar value 0
+					progressLabel.text("");
+				}
+				//debugger;
+				if (stopProc == 0 && aborted==0) {
+					var val = progressbar.progressbar("value") || 0;
+					progressbar.progressbar("value", val + parseInt(increaseBar));
+					if (val < resulArr.length) {
+						setTimeout(progress, 50);
+					} else {
+						progressbar.progressbar("value", 100);
+						$('#Files').val('');
+						$('#FileBrowse').find("*").prop("disabled", false);
+						$('#UploadBtn').find("*").prop("disabled", false);
+						$('#PauseBtn').find("*").prop("disabled", false);
+						$('#PauseBtn').hide();
+						$("#abortBtn").hide();
+
+						document.getElementById('succAlert').style.display = "";
+						document.getElementById('succAlertMes').innerHTML = '' + successMessage;
+					}
+				}
+			}
+			setTimeout(progress, 100);
+		}
+
+		$('#PauseBtn').click(function () {
+			stopProc = 1;
+			$("#PauseBtn").hide();
+			$("#ContinueBtn").show();
+		});
+
+		$('#ContinueBtn').click(function () {
+			stopProc = 0;
+			$("#ContinueBtn").hide();
+			$("#PauseBtn").show();
+			//var progressbar = $("#progressbar-5");
+			progressbar.progressbar("value", lastIndex);
+			LoadProgressBar(resulArr);
+		});
+
+		$('#abortBtn').click(function () {
+			initPage();
+			debugger;
+			progressbar.progressbar("value", 0);
+			progressLabel.text(
+				progressbar.progressbar("value") + "%");
+			aborted++;
+			$('#Files').val('');
+			$('#FileBrowse').find("*").prop("disabled", false);
+			$('#UploadBtn').find("*").prop("disabled", false);
+			$('#PauseBtn').find("*").prop("disabled", false);
+			$('#PauseBtn').hide();
+			$('#ContinueBtn').hide();
+			$("#abortBtn").hide();
+		});
+
+		function exportToFileClck() {
+
+			$.ajax({
+					type: "POST",
+					url: "@Url.Action("setLastIndex", "Home")",
+					data: { lastIndex: lastIndex },
+					dataType: "json",
+					traditional: true
+			});
+			window.location = '@Url.Action("ExportToTxtFile", "Home")';
+
+		}
+
+	</script>
+}
+
